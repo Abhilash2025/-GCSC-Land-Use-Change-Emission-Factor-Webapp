@@ -5,44 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GCSC — Land Use Change Emission Factor Extractor</title>
-  <!-- ALL data bundles loaded statically (works on file://) -->
-  <script src="data/index.js"></script>
-  <script src="data/co/cocoa_co_products_adm0.js"></script>
-  <script src="data/co/cocoa_co_products_adm1.js"></script>
-  <script src="data/co/cocoa_co_products_adm2.js"></script>
-  <script src="data/co/oilp_co_products_adm0.js"></script>
-  <script src="data/co/oilp_co_products_adm1.js"></script>
-  <script src="data/co/oilp_co_products_adm2.js"></script>
-  <script src="data/co/soyb_co_products_adm0.js"></script>
-  <script src="data/co/soyb_co_products_adm1.js"></script>
-  <script src="data/co/soyb_co_products_adm2.js"></script>
-  <script src="data/gadm/adm0.js"></script>
-  <script src="data/gadm/adm1.js"></script>
-  <script src="data/gadm/adm2.js"></script>
-  <script src="data/sLUC/adm0_CH4.js"></script>
-  <script src="data/sLUC/adm0_CO2.js"></script>
-  <script src="data/sLUC/adm0_CO2e.js"></script>
-  <script src="data/sLUC/adm0_N2O.js"></script>
-  <script src="data/sLUC/global_CO2e.js"></script>
-  <script src="data/sLUC/adm1_CH4.js"></script>
-  <script src="data/sLUC/adm1_CO2.js"></script>
-  <script src="data/sLUC/adm1_CO2e.js"></script>
-  <script src="data/sLUC/adm1_N2O.js"></script>
-  <script src="data/sLUC/adm2_CH4.js"></script>
-  <script src="data/sLUC/adm2_CO2.js"></script>
-  <script src="data/sLUC/adm2_CO2e.js"></script>
-  <script src="data/sLUC/adm2_N2O.js"></script>
-  <script src="data/jdLUC/jdLUC_COCO_GHA_CIV_admin0.js"></script>
-  <script src="data/jdLUC/jdLUC_COCO_GHA_CIV_admin1.js"></script>
-  <script src="data/jdLUC/jdLUC_COCO_GHA_CIV_admin2.js"></script>
-  <script src="data/jdLUC/jdLUC_OILP_admin0.js"></script>
-  <script src="data/jdLUC/jdLUC_OILP_admin1.js"></script>
-  <script src="data/jdLUC/jdLUC_OILP_admin2.js"></script>
-  <script src="data/jdLUC/jdLUC_SOYB_SA_admin0.js"></script>
-  <script src="data/jdLUC/jdLUC_SOYB_SA_admin1.js"></script>
-  <script src="data/jdLUC/jdLUC_SOYB_SA_admin2.js"></script>
-  <script src="data/yield/gadm0.js"></script>
-  <script src="data/yield/gadm1.js"></script>
+  <!-- Data is fetched on demand from the GitHub Pages data/ folder (lazy loading). -->
   <style>
     :root {
       --bg: #0a0a0a;
@@ -657,7 +620,7 @@
     <div style="height:48px" aria-hidden="true"></div>
 
     <div class="error-banner" id="errorBanner"></div>
-    <div class="loading show" id="bootLoading"><span class="spinner"></span>Loading database index…</div>
+    <div class="loading show" id="bootLoading"><span class="spinner"></span>Connecting to GitHub Pages data…</div>
 
     <div class="grid cols-2">
       <div>
@@ -835,40 +798,40 @@
 
     const $ = id => document.getElementById(id);
 
-    /* All data bundles are statically loaded via <script> tags into window.__DATA.
-       loadData resolves synchronously from that cache. */
+    /* Data bundles are fetched on demand from the GitHub Pages data/ folder and cached.
+       Bundles are JS files that assign into window.__DATA (same shape as before). */
     const __loadedKeys = new Set();
     function loadData(relPath) {
       return new Promise((resolve, reject) => {
         if (window.__DATA && window.__DATA[relPath]) { __loadedKeys.add(relPath); resolve(window.__DATA[relPath]); return; }
         if (__loadedKeys.has(relPath)) { resolve(window.__DATA[relPath]); return; }
-        // On-demand load for large bundles not statically preloaded (e.g. admin2 sLUC)
-        const s = document.createElement('script');
         const src = 'data/' + relPath.replace(/\.json$/, '.js');
-        let settled = false;
-        const finish = () => { if (settled) return; settled = true; __loadedKeys.add(relPath); resolve(window.__DATA[relPath]); };
-        s.onload = finish;
-        s.onerror = () => { if (settled) return; settled = true; reject(new Error('Could not load ' + src)); };
-        document.head.appendChild(s);
-        // Fallback: poll for the data to appear (onload can be flaky for very large scripts)
-        const t0 = Date.now();
-        const iv = setInterval(() => {
-          if (window.__DATA && window.__DATA[relPath]) { clearInterval(iv); finish(); }
-          else if (Date.now() - t0 > 30000) { clearInterval(iv); if (!settled) { settled = true; reject(new Error('Timed out loading ' + relPath)); } }
-        }, 300);
+        fetch(src, { cache: 'force-cache' })
+          .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' loading ' + src); return r.text(); })
+          .then(text => {
+            // The bundle is `window.__DATA = window.__DATA||{}; window.__DATA["rel"]=...;`
+            (0, eval)(text);
+            __loadedKeys.add(relPath);
+            resolve(window.__DATA[relPath]);
+          })
+          .catch(err => reject(err));
       });
     }
 
     /* ================= INIT ================= */
     async function boot() {
       try {
-        // index + gadm adm0/adm1 are preloaded via static <script> tags (file:// safe)
-        STATE.index = window.__DATA['index.json'];
+        // Fetch only the essentials at boot: index + country/state/municipality keys.
+        // Everything else (sLUC, jdLUC, co-products, yield) loads lazily on demand.
+        STATE.index = await loadData('index.json');
         if (!STATE.index) { throw new Error('index.json did not load'); }
         STATE.commodities = STATE.index.commodities;
-        STATE.gadm0 = window.__DATA['gadm/adm0.json'];
-        STATE.gadm1 = window.__DATA['gadm/adm1.json'];
-        STATE.gadm2 = window.__DATA['gadm/adm2.json'];
+        const [g0, g1, g2] = await Promise.all([
+          loadData(STATE.index.gadm.admin0),
+          loadData(STATE.index.gadm.admin1),
+          loadData(STATE.index.gadm.admin2)
+        ]);
+        STATE.gadm0 = g0; STATE.gadm1 = g1; STATE.gadm2 = g2;
         fillCommodities();
         fillYear();
         fillGas();
