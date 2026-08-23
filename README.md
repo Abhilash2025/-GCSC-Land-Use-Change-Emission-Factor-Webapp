@@ -1,4 +1,4 @@
-# GCSC Land Use Change Emission Factor Extractor
+# GCSC Land Use Change Emission Factor 
 
 A single-file static webapp that extracts **statistical land use change (sLUC)** and **jurisdictional direct land use change (jdLUC)** emission factors from the **WRI GCSC** (Global Cropland Scope-3 Carbon) database — by commodity, country, and sub-region (down to municipality level) — with co-product/by-product allocation where available. Includes result export to CSV.
 
