@@ -6,6 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GCSC — Land Use Change Emission Factor Extractor</title>
   <!-- Data is fetched on demand from the GitHub Pages data/ folder (lazy loading). -->
+  <script>
+    // Apply the stored theme before first paint to avoid a flash of the wrong theme.
+    (function () {
+      try {
+        var t = localStorage.getItem('gcsc-theme');
+        if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) t = 'light';
+        if (t) document.documentElement.setAttribute('data-theme', t);
+      } catch (e) { }
+    })();
+  </script>
   <style>
     :root {
       --bg: #0a0a0a;
@@ -117,16 +127,87 @@
       box-shadow: inset 0 0 0 1px var(--border)
     }
 
-    .theme-toggle {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 8px;
-      padding: 8px 14px;
-      cursor: pointer;
-      font-size: 16px;
-      justify-self: end
-    }
+    /* ============================================================
+   Theme toggle — sun / moon icon swap
+   ============================================================ */
+.theme-toggle {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 50%;
+  cursor: pointer;
+  justify-self: end;
+  overflow: hidden;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  transform: scale(1.06)
+}
+
+.theme-toggle:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, .18)
+}
+
+.theme-toggle svg {
+  width: 19px;
+  height: 19px;
+  position: absolute;
+  transition: transform .32s cubic-bezier(.4, 0, .2, 1), opacity .22s ease
+}
+
+.theme-toggle .icon-sun {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 2;
+  stroke-linecap: round
+}
+
+.theme-toggle .icon-moon {
+  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round
+}
+
+/* dark theme is the default: show the moon, keep the sun hidden */
+html[data-theme="dark"] .theme-toggle .icon-sun {
+  transform: rotate(-90deg) scale(.4);
+  opacity: 0
+}
+
+html[data-theme="dark"] .theme-toggle .icon-moon {
+  transform: rotate(0deg) scale(1);
+  opacity: 1
+}
+
+html[data-theme="light"] .theme-toggle .icon-sun {
+  transform: rotate(0deg) scale(1);
+  opacity: 1
+}
+
+html[data-theme="light"] .theme-toggle .icon-moon {
+  transform: rotate(90deg) scale(.4);
+  opacity: 0
+}
+
+/* small screens: keep the toggle visible but sized down */
+@media(max-width:720px) {
+  .theme-toggle {
+    justify-self: center;
+    width: 36px;
+    height: 36px
+  }
+}
 
     .wrap {
       max-width: 1100px;
@@ -166,7 +247,9 @@
       padding: 24px;
       opacity: 0;
       transform: translateY(16px);
-      transition: opacity .5s ease, transform .5s ease
+      transition: opacity .5s ease, transform .5s ease;
+      /* anchor links must not slide the heading under the sticky topbar */
+      scroll-margin-top: 96px
     }
 
     section.visible {
@@ -234,6 +317,7 @@
       border-radius: 8px;
       padding: 10px 12px;
       font-size: 14px;
+      font-family: inherit;
       appearance: none;
       -webkit-appearance: none;
       outline: none
@@ -244,20 +328,220 @@
       border-color: var(--accent)
     }
 
-    .select-wrap {
-      position: relative
+    input::placeholder {
+      color: var(--muted)
     }
 
-    .select-wrap::after {
-      content: "▾";
-      position: absolute;
-      right: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--muted);
-      pointer-events: none;
-      font-size: 12px
-    }
+    /* ============================================================
+   Custom select (searchable dropdown)
+   Replaces native <select> styling: bordered trigger, chevron,
+   popup with search field + scrollable list.
+   ============================================================ */
+.select-wrap {
+  position: relative;
+  z-index: 1
+}
+
+.select-wrap.open {
+  z-index: 70
+}
+
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+  transition: transform .15s ease, border-color .15s ease
+}
+
+.select-wrap.open::after {
+  transform: translateY(-30%) rotate(225deg);
+  border-color: var(--accent)
+}
+
+/* trigger */
+select.sel {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 36px 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  transition: border-color .15s ease, box-shadow .15s ease
+}
+
+select.sel:hover:not(:disabled) {
+  border-color: var(--muted)
+}
+
+select.sel:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, .18)
+}
+
+select.sel:disabled {
+  opacity: .5;
+  cursor: not-allowed
+}
+
+/* native select is visually hidden but stays the real form control */
+select.sel.real {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  padding: 0;
+  border: 0
+}
+
+/* visible trigger (button) */
+.sel-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease
+}
+
+.sel-trigger:hover:not(:disabled) {
+  border-color: var(--muted)
+}
+
+.sel-trigger:focus-visible,
+.select-wrap.open .sel-trigger {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, .18)
+}
+
+.sel-trigger:disabled {
+  opacity: .5;
+  cursor: not-allowed
+}
+
+.sel-trigger .val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.sel-trigger .val.placeholder {
+  color: var(--muted)
+}
+
+/* popup */
+.sel-menu {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(460px, 92vw);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 4px
+}
+
+.select-wrap.open .sel-menu {
+  display: flex
+}
+
+.sel-search {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none
+}
+
+.sel-search:focus {
+  border-color: var(--accent)
+}
+
+.sel-search::placeholder {
+  color: var(--muted)
+}
+
+.sel-list {
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain
+}
+
+.sel-list::-webkit-scrollbar {
+  width: 8px
+}
+
+.sel-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px
+}
+
+.sel-list::-webkit-scrollbar-track {
+  background: transparent
+}
+
+.sel-opt {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35
+}
+
+.sel-opt:hover,
+.sel-opt.hl {
+  background: var(--card);
+  color: var(--accent)
+}
+
+.sel-opt.selected {
+  color: var(--accent);
+  font-weight: 600
+}
+
+.sel-empty {
+  padding: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center
+}
 
     .btn {
       background: var(--accent);
@@ -395,6 +679,10 @@
     .stat .val {
       font-size: 20px;
       font-weight: 700
+    }
+
+    .stat.accent .val {
+      color: var(--accent)
     }
 
     .stat .sub {
@@ -560,11 +848,19 @@
     <div class="topbar-inner">
       <div class="brand"><span class="dot"></span> Land Use Change Emission Factors</div>
       <nav>
-        <a href="#extractor" class="active">Emission factor</a>
+        <a href="#about" class="active">About</a>
         <a href="#method">Method</a>
-        <a href="#about">About</a>
+        <a href="#extractor">Emission factor</a>
       </nav>
-      <button class="theme-toggle" onclick="toggleTheme()">☾</button>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Switch to light theme" title="Switch to light theme" id="themeToggle">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" />
+          <path d="M12 2.2v2.4M12 19.4v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.2 12h2.4M19.4 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7" />
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20.5 14.3A8.5 8.5 0 1 1 9.7 3.5a6.8 6.8 0 0 0 10.8 10.8z" />
+        </svg>
+      </button>
     </div>
   </header>
 
@@ -572,8 +868,113 @@
     <h1>Statistical &amp; Jurisdictional LUC Emission Factors</h1>
   </div>
 
-  <section id="extractor" class="visible">
-    <h2><span class="num">01</span>Emission Factor</h2>
+  <section id="about" class="visible">
+    <h2><span class="num">01</span>About the Data</h2>
+    <p>The dataset was developed by Fitts et al. (2025) and integrates SPAM 2020 v2.0 cropland maps, Global Forest Watch
+      tree cover loss and forest carbon flux data, Global Pasture Watch, and drivers of forest loss to isolate
+      agriculture-driven deforestation. It covers deforestation-driven LUC (forest to cropland) only; other conversions
+      are out of scope. It is intended for crop commodities only.</p>
+    <p>Emissions are reported in tonnes CO2e per tonne of commodity. Traceability guidance recommends the finest
+      available level (ADM2 over ADM1 over ADM0) and scaling up when a municipality has very low commercial production.
+    </p>
+    <div class="stat-grid" style="margin-top:16px">
+      <div class="stat accent">
+        <div class="lbl">Reporting years</div>
+        <div class="val">2020–2025</div>
+        <div class="sub">sLUC emission factors</div>
+      </div>
+      <div class="stat accent">
+        <div class="lbl">Commodities</div>
+        <div class="val">42</div>
+        <div class="sub">crops (SPAM codes)</div>
+      </div>
+      <div class="stat accent">
+        <div class="lbl">Traceability levels</div>
+        <div class="val">4</div>
+        <div class="sub">Global · ADM0 · ADM1 · ADM2</div>
+      </div>
+      <div class="stat accent">
+        <div class="lbl">Coverage</div>
+        <div class="val">36,375</div>
+        <div class="sub">municipalities (ADM2 units)</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <section id="method">
+    <h2><span class="num">02</span>Method &amp; Data Structure</h2>
+    <p>The GCSC database (Fitts et al., 2025) provides spatially explicit statistical land use change (sLUC) emission
+      factors for 42 agricultural crops across global, national (ADM0), subnational (ADM1), and local (ADM2) scales,
+      with reporting years 2020–2025. sLUC emission factors are expressed in tonnes CO2e per tonne of crop, and quantify
+      GHG emissions from deforestation linked to agricultural expansion over a 20-year assessment period (2001–2020).
+    </p>
+    <p>Separately, <strong>jurisdictional direct land use change (jdLUC)</strong> emission factors are provided for oil
+      palm, soy, and cocoa at ADM0/ADM1/ADM2 levels. Where a raw crop has co-products or by-products (oil palm, soy,
+      cocoa), the raw crop emission factor is multiplied by a co-product allocation ratio (e.g., from Appendix C of the
+      companion technical note) to obtain the product-level emission factor.</p>
+    <p>CO2e is the sum of CO2 + CH4 + N2O. Each gas is expressed in CO2e. Yield factors (tonnes and kg per hectare, plus
+      1/yield) are included for land-occupation calculations.</p>
+    <div class="card" style="margin-top:16px;border-left:3px solid var(--accent)">
+      <strong style="color:var(--accent)">What the 2025 release covers</strong>
+      <p style="margin-top:8px">The <strong>2025 reporting year</strong> was added to the sLUC tables, and the
+        2020–2024 history was <strong>revised upstream</strong> — figures for earlier years differ from the previous
+        release, so re-extract rather than carry over values from an earlier version of this tool.</p>
+      <p style="margin-top:8px">The 2025 release covers <strong>sLUC only</strong>. The jdLUC, co-product allocation
+        and yield-factor tables were not republished and remain on their 2020–2024 basis. Co-product allocation ratios
+        are time-invariant, so mixing a 2025 sLUC factor with the existing ratios is valid.</p>
+      <p style="margin-top:8px">A <strong>global (world average)</strong> table is not published for 2025. It is
+        derived here exactly as WRI derives it — world LD and production are the sums of the ADM0 values, and the global
+        emission factor is LD ÷ production. The method was validated against the previously published global table for
+        all 42 crops across 2020–2024.</p>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Dataset</th>
+              <th>Commodities</th>
+              <th>Admin levels</th>
+              <th>Fields</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge teal">sLUC</span> Statistical LUC EFs</td>
+              <td>42 crops</td>
+              <td>Global · ADM0 · ADM1 · ADM2</td>
+              <td>LD_{y}, production_{y}, EF_{y} per gas (CO2e, CO2, CH4, N2O)</td>
+            </tr>
+            <tr>
+              <td><span class="badge green">jdLUC</span> Jurisdictional LUC EFs</td>
+              <td>Oil palm · Soy · Cocoa</td>
+              <td>ADM0 · ADM1 · ADM2</td>
+              <td>area_ha, yield, production, LD_{y}_{gas}, EF_{y}_{gas}</td>
+            </tr>
+            <tr>
+              <td><span class="badge teal">Co-products</span></td>
+              <td>Oil palm · Soy · Cocoa</td>
+              <td>ADM0 · ADM1 · ADM2</td>
+              <td>co_product, functional_unit, allocation_ratio, co_product_EF_{y}</td>
+            </tr>
+            <tr>
+              <td><span class="badge teal">Yield factors</span></td>
+              <td>42 crops</td>
+              <td>ADM0 · ADM1</td>
+              <td>yield_mt, yield_kg, yield_factor_kg (1/yield)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <section id="extractor">
+    <h2><span class="num">03</span>Emission Factor</h2>
     <p><strong>How to use this tool</strong> — Follow the steps top-to-bottom: <span class="badge teal">1</span> pick a
       <em>commodity</em>, <span class="badge teal">2</span> choose a <em>traceability level</em> (municipality →
       state/province → national, in that order of preference, or global world average), <span
@@ -695,85 +1096,21 @@
     </div>
   </section>
 
-  <div class="section-divider"></div>
-
-  <section id="method">
-    <h2><span class="num">02</span>Method &amp; Data Structure</h2>
-    <p>The GCSC database (Fitts et al., 2025) provides spatially explicit statistical land use change (sLUC) emission
-      factors for 42 agricultural crops across global, national (ADM0), subnational (ADM1), and local (ADM2) scales,
-      with reporting years 2020–2024. sLUC emission factors are expressed in tonnes CO2e per tonne of crop, and quantify
-      GHG emissions from deforestation linked to agricultural expansion over a 20-year assessment period (2001–2020).
-    </p>
-    <p>Separately, <strong>jurisdictional direct land use change (jdLUC)</strong> emission factors are provided for oil
-      palm, soy, and cocoa at ADM0/ADM1/ADM2 levels. Where a raw crop has co-products or by-products (oil palm, soy,
-      cocoa), the raw crop emission factor is multiplied by a co-product allocation ratio (e.g., from Appendix C of the
-      companion technical note) to obtain the product-level emission factor.</p>
-    <p>CO2e is the sum of CO2 + CH4 + N2O. Each gas is expressed in CO2e. Yield factors (tonnes and kg per hectare, plus
-      1/yield) are included for land-occupation calculations.</p>
-    <div class="card" style="margin-top:16px">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Dataset</th>
-              <th>Commodities</th>
-              <th>Admin levels</th>
-              <th>Fields</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><span class="badge teal">sLUC</span> Statistical LUC EFs</td>
-              <td>42 crops</td>
-              <td>Global · ADM0 · ADM1 · ADM2</td>
-              <td>LD_{y}, production_{y}, EF_{y} per gas (CO2e, CO2, CH4, N2O)</td>
-            </tr>
-            <tr>
-              <td><span class="badge green">jdLUC</span> Jurisdictional LUC EFs</td>
-              <td>Oil palm · Soy · Cocoa</td>
-              <td>ADM0 · ADM1 · ADM2</td>
-              <td>area_ha, yield, production, LD_{y}_{gas}, EF_{y}_{gas}</td>
-            </tr>
-            <tr>
-              <td><span class="badge teal">Co-products</span></td>
-              <td>Oil palm · Soy · Cocoa</td>
-              <td>ADM0 · ADM1 · ADM2</td>
-              <td>co_product, functional_unit, allocation_ratio, co_product_EF_{y}</td>
-            </tr>
-            <tr>
-              <td><span class="badge teal">Yield factors</span></td>
-              <td>42 crops</td>
-              <td>ADM0 · ADM1</td>
-              <td>yield_mt, yield_kg, yield_factor_kg (1/yield)</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <div class="section-divider"></div>
-
-  <section id="about">
-    <h2><span class="num">03</span>About the Data</h2>
-    <p>The dataset was developed by Fitts et al. (2025) and integrates SPAM 2020 v2.0 cropland maps, Global Forest Watch
-      tree cover loss and forest carbon flux data, Global Pasture Watch, and drivers of forest loss to isolate
-      agriculture-driven deforestation. It covers deforestation-driven LUC (forest to cropland) only; other conversions
-      are out of scope. It is intended for crop commodities only.</p>
-    <p>Emissions are reported in tonnes CO2e per tonne of commodity. Traceability guidance recommends the finest
-      available level (ADM2 over ADM1 over ADM0) and scaling up when a municipality has very low commercial production.
-    </p>
-  </section>
-
   <footer class="footer">
     <h4>Sources</h4>
     <p><a href="https://github.com/wri/GCSC" target="_blank" rel="noopener">github.com/wri/GCSC</a> — WRI Global
-      Cropland Scope-3 Carbon (GCSC) repository.</p>
+      Cropland Scope-3 Carbon (GCSC) repository. sLUC data from the <strong>2025 release</strong>
+      (<code>data/2025_update/</code>, commit <code>2a67dc8e</code>, 10 September 2026) — reporting years 2020–2025.</p>
     <p style="margin-top:8px">Fitts, L.A., O. James, D. Gibbs, E. Goldman, N. Harris, M. Ramlow, L. Sloat, C. Wilson, C.
       Winchester, A. Ernstoff, T. Hohmann, A. Stern, I. Irache, I. Salim, J. van Diepen, G.A. Cuevas-Castillo, and J.
       Capuano. 2025. "Geospatial methods for corporate GHG accounting of deforestation and land occupation." Guidebook.
       Washington, DC: World Resources Institute. Available online at <a href="https://doi.org/10.46830/wrigb.22.00158"
         target="_blank" rel="noopener">doi.org/10.46830/wrigb.22.00158</a>.</p>
+    <p style="margin-top:8px">Fitts, L.A., O. James, D. Gibbs, E. Goldman, N.Harris, M. Ramlow, L. Sloat, B. Wielgosz, C.
+      Wilson, C. Winchester, A. Ernstoff, T. Hohmann, V. Rossi, and A. Stern. 2025. "Statistical land use change emissions
+      from deforestation and land occupation for crops." Technical Note. Washington, DC: World Resources Institute.
+      Available online at <a href="https://doi.org/10.46830/writn.25.00085" target="_blank"
+        rel="noopener">doi.org/10.46830/writn.25.00085</a>.</p>
     <h4 style="margin-top:16px">Disclaimer</h4>
     <p>This is a simplified analysis and does not capture all nuances of the standards or methodologies. Emission
       factors are reproduced as-is from the source database. This tool does not capture all nuances of the sLUC, jdLUC,
@@ -782,6 +1119,181 @@
   </footer>
 
   <script>
+    /* ============================================================
+       Custom searchable select.
+       The native <select> stays in the DOM as the real form control
+       (so every existing .value / .disabled / .onchange read keeps
+       working); a styled trigger + popup is layered on top of it.
+       ============================================================ */
+    const SEL_PLACEHOLDER = {
+      commodity: 'Select a commodity…',
+      traceLevel: 'Select a traceability level…',
+      country: 'Select a country…',
+      region: 'Select a state / province…',
+      municipality: 'Select a municipality / county…',
+      year: 'Select a year…',
+      gas: 'Select a gas…'
+    };
+
+    function enhanceSelect(sel) {
+      if (sel.dataset.enhanced) return;
+      sel.dataset.enhanced = '1';
+      const wrap = sel.parentElement;
+      if (!wrap || !wrap.classList.contains('select-wrap')) return;
+
+      sel.classList.add('sel', 'real');
+      sel.setAttribute('tabindex', '-1');
+      sel.setAttribute('aria-hidden', 'true');
+
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'sel-trigger';
+      trigger.setAttribute('role', 'combobox');
+      trigger.setAttribute('aria-haspopup', 'listbox');
+      trigger.setAttribute('aria-expanded', 'false');
+      trigger.innerHTML = '<span class="val placeholder"></span>';
+
+      const menu = document.createElement('div');
+      menu.className = 'sel-menu';
+      menu.setAttribute('role', 'listbox');
+      const search = document.createElement('input');
+      search.type = 'text';
+      search.className = 'sel-search';
+      search.placeholder = 'Search…';
+      search.setAttribute('aria-label', 'Search options');
+      const list = document.createElement('div');
+      list.className = 'sel-list';
+      menu.append(search, list);
+
+      wrap.append(trigger, menu);
+
+      const optLabel = o => o.textContent.trim();
+      const isPlaceholder = o => o.value === '';
+
+      function syncTrigger() {
+        const v = sel.value;
+        const o = sel.selectedOptions[0];
+        const span = trigger.querySelector('.val');
+        if (!o) {
+          span.textContent = SEL_PLACEHOLDER[sel.id] || 'Select…';
+          span.classList.add('placeholder');
+        } else {
+          span.textContent = optLabel(o);
+          span.classList.toggle('placeholder', isPlaceholder(o));
+        }
+        trigger.disabled = sel.disabled;
+        trigger.setAttribute('aria-disabled', sel.disabled ? 'true' : 'false');
+        trigger.title = o ? optLabel(o) : '';
+      }
+
+      function renderList(filter) {
+        list.innerHTML = '';
+        const q = (filter || '').trim().toLowerCase();
+        // The empty-value option is only a placeholder for the trigger; it must not
+        // appear as a selectable row in the popup.
+        const opts = [...sel.options].filter(o => !isPlaceholder(o) &&
+          (!q || optLabel(o).toLowerCase().includes(q)));
+        if (!opts.length) {
+          const e = document.createElement('div');
+          e.className = 'sel-empty';
+          e.textContent = 'No matches';
+          list.append(e);
+          return;
+        }
+        opts.forEach(o => {
+          const d = document.createElement('div');
+          d.className = 'sel-opt' + (o.selected ? ' selected' : '');
+          d.setAttribute('role', 'option');
+          d.setAttribute('aria-selected', o.selected ? 'true' : 'false');
+          d.textContent = optLabel(o);
+          d.onclick = () => { choose(o); };
+          list.append(d);
+        });
+      }
+
+      let hi = -1;
+      function options() { return [...list.querySelectorAll('.sel-opt')]; }
+      function highlight(i) {
+        const os = options();
+        if (!os.length) return;
+        hi = (i + os.length) % os.length;
+        os.forEach((o, k) => o.classList.toggle('hl', k === hi));
+        os[hi].scrollIntoView({ block: 'nearest' });
+      }
+
+      function choose(o) {
+        sel.value = o.value;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        close();
+        trigger.focus();
+      }
+
+      function open() {
+        document.querySelectorAll('.select-wrap.open').forEach(w => {
+          if (w !== wrap) w.classList.remove('open');
+        });
+        wrap.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+        search.value = '';
+        renderList('');
+        hi = -1;
+        const sel2 = list.querySelector('.sel-opt.selected');
+        if (sel2) { hi = options().indexOf(sel2); sel2.scrollIntoView({ block: 'nearest' }); }
+        setTimeout(() => search.focus(), 0);
+      }
+      function close() {
+        wrap.classList.remove('open');
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+
+      trigger.addEventListener('click', e => {
+        e.stopPropagation();
+        wrap.classList.contains('open') ? close() : open();
+      });
+      search.addEventListener('input', () => { renderList(search.value); hi = -1; });
+      search.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); highlight(hi + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(hi - 1); }
+        else if (e.key === 'Enter') {
+          e.preventDefault();
+          const os = options();
+          if (os[hi]) os[hi].click();
+        } else if (e.key === 'Escape') { e.preventDefault(); close(); trigger.focus(); }
+      });
+      menu.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { e.preventDefault(); close(); trigger.focus(); }
+      });
+      menu.addEventListener('click', e => e.stopPropagation());
+
+      // reflect programmatic value changes (e.g. $('year').value = '2025')
+      const protoDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+      Object.defineProperty(sel, 'value', {
+        get() { return protoDesc.get.call(this); },
+        set(v) { protoDesc.set.call(this, v); syncTrigger(); },
+        configurable: true
+      });
+      // reflect disabled state
+      const disDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'disabled');
+      Object.defineProperty(sel, 'disabled', {
+        get() { return disDesc.get.call(this); },
+        set(v) { disDesc.set.call(this, v); syncTrigger(); },
+        configurable: true
+      });
+      // rebuild the list when options change
+      new MutationObserver(() => { renderList(''); syncTrigger(); })
+        .observe(sel, { childList: true, subtree: true });
+
+      sel.addEventListener('change', syncTrigger);
+      syncTrigger();
+    }
+
+    function enhanceAllSelects() {
+      document.querySelectorAll('select').forEach(enhanceSelect);
+      document.addEventListener('click', () => {
+        document.querySelectorAll('.select-wrap.open').forEach(w => w.classList.remove('open'));
+      });
+    }
+
     /* ================= STATE & DATA ================= */
     const STATE = {
       index: null,
@@ -799,13 +1311,21 @@
     const $ = id => document.getElementById(id);
 
     /* Data bundles are fetched on demand from the GitHub Pages data/ folder and cached.
-       Bundles are JS files that assign into window.__DATA (same shape as before). */
+       Bundles are JS files that assign into window.__DATA (same shape as before).
+
+       When the page is opened directly from disk (file://), a relative "data/…" path
+       resolves to a local file the browser refuses to fetch. In that case we fall back
+       to the absolute GitHub Pages URL — Pages sends `access-control-allow-origin: *`,
+       so the cross-origin fetch is allowed and the page still works off the CDN. */
+    const DATA_CDN = 'https://abhilash2025.github.io/-GCSC-Land-Use-Change-Emission-Factor-Webapp/';
+    const IS_FILE_PROTOCOL = location.protocol === 'file:';
+    const DATA_BASE = IS_FILE_PROTOCOL ? DATA_CDN : '';
     const __loadedKeys = new Set();
     function loadData(relPath) {
       return new Promise((resolve, reject) => {
         if (window.__DATA && window.__DATA[relPath]) { __loadedKeys.add(relPath); resolve(window.__DATA[relPath]); return; }
         if (__loadedKeys.has(relPath)) { resolve(window.__DATA[relPath]); return; }
-        const src = 'data/' + relPath.replace(/\.json$/, '.js');
+        const src = DATA_BASE + 'data/' + relPath.replace(/\.json$/, '.js');
         fetch(src, { cache: 'force-cache' })
           .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' loading ' + src); return r.text(); })
           .then(text => {
@@ -820,6 +1340,10 @@
 
     /* ================= INIT ================= */
     async function boot() {
+      // The static content (sections, headings, guidance) must be readable even if the
+      // data bundles cannot be fetched — e.g. when this file is opened directly from
+      // disk, where fetch() of local data/ bundles is blocked by the browser.
+      document.querySelectorAll('section').forEach(s => s.classList.add('visible'));
       try {
         // Fetch only the essentials at boot: index + country/state/municipality keys.
         // Everything else (sLUC, jdLUC, co-products, yield) loads lazily on demand.
@@ -837,10 +1361,14 @@
         fillGas();
         populateTrace();
         $('bootLoading').classList.remove('show');
-        document.querySelectorAll('section').forEach(s => s.classList.add('visible'));
+        enhanceAllSelects();
       } catch (e) {
         $('bootLoading').classList.remove('show');
-        showError('Failed to load database: ' + e.message);
+        if (IS_FILE_PROTOCOL) {
+          showError('This page is open directly from disk and could not load the data bundles from the GitHub Pages CDN either. Check your internet connection, or open the hosted URL: ' + DATA_CDN + 'index.html');
+        } else {
+          showError('Failed to load database: ' + e.message);
+        }
       }
     }
 
@@ -854,7 +1382,9 @@
 
     function fillYear() {
       $('year').innerHTML = STATE.index.years.map(y => `<option value="${y}">${y}</option>`).reverse().join('');
-      $('year').value = '2024';
+      // default to the most recent reporting year available in the data
+      const years = STATE.index.years;
+      $('year').value = years[years.length - 1];
       $('year').onchange = () => { STATE.sel.year = $('year').value; clearResult(); };
     }
     function fillGas() {
@@ -1253,7 +1783,30 @@
     function toggleTheme() {
       const h = document.documentElement;
       const cur = h.getAttribute('data-theme');
-      h.setAttribute('data-theme', cur === 'light' ? 'dark' : 'light');
+      const next = cur === 'light' ? 'dark' : 'light';
+      h.setAttribute('data-theme', next);
+      try { localStorage.setItem('gcsc-theme', next); } catch (e) { }
+      updateThemeToggleLabel();
+    }
+
+    function updateThemeToggleLabel() {
+      const btn = $('themeToggle');
+      if (!btn) return;
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const label = isLight ? 'Switch to dark theme' : 'Switch to light theme';
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('title', label);
+    }
+
+    function applyStoredTheme() {
+      let t = null;
+      try { t = localStorage.getItem('gcsc-theme'); } catch (e) { }
+      if (!t) {
+        const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        t = prefersLight ? 'light' : 'dark';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+      updateThemeToggleLabel();
     }
 
     /* particles */
@@ -1273,6 +1826,7 @@
       }, { passive: true });
     })();
 
+    applyStoredTheme();
     boot();
   </script>
 </body>
